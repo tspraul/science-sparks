@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Melting Ice & Evaporation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            margin: 0;
+            padding: 1rem;
+        }
+        .animation-container {
+            width: 300px;
+            height: 300px;
+            background-color: #ffffff; /* White background for canvas */
+            border-radius: 0.75rem; /* Rounded corners */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Soft shadow */
+            position: relative;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            border-radius: 0.75rem; /* Match container rounding */
+        }
+        .controls {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex; 
+            gap: 10px;
+            z-index: 10; /* Ensure controls are on top of the canvas */
+        }
+        .controls button {
+            padding: 8px 15px;
+            border-radius: 0.5rem;
+            border: none;
+            background-color: #3b82f6; /* Blue button */
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s, opacity 0.3s;
+            opacity: 0; /* Initially hidden */
+            visibility: hidden; 
+        }
+        .controls button.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .controls button:hover {
+            background-color: #2563eb; /* Darker blue on hover */
+        }
+    </style>
+</head>
+<body>
+    <div class="animation-container">
+        <canvas id="scienceCanvas"></canvas>
+        <div class="controls">
+            <button id="restartButton">Restart</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('scienceCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.querySelector('.animation-container');
+        const restartButton = document.getElementById('restartButton');
+
+        let animationFrameId;
+
+        function resizeCanvas() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            if (typeof initializeAnimationParameters === 'function') {
+                initializeAnimationParameters();
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Animation parameters
+        let groundLevel; // Top of the brown ground strip & puddle surface
+        let iceBottomY;  // Y-coordinate for the bottom of the ice cube
+        let iceInitialSize;
+        let puddleMaxWidth;
+        let puddleMaxHeight;
+
+        let iceSize;
+        let puddleWidth;
+        let puddleHeight;
+        const evaporationRate = 0.05;
+
+        let phase; 
+
+        function initializeAnimationParameters() {
+            groundLevel = canvas.height - 35; // Top of the brown ground strip
+            
+            // Calculate where the bottom of the ice cube should be:
+            // Halfway between groundLevel and the bottom of the canvas (canvas.height)
+            iceBottomY = groundLevel + ((canvas.height - groundLevel) / 2);
+
+            iceInitialSize = Math.min(canvas.width, canvas.height) * 0.25;
+            puddleMaxWidth = canvas.width * 0.7;
+            // PuddleMaxHeight is relative to the ice cube size, but puddle forms at groundLevel
+            puddleMaxHeight = iceInitialSize * 0.5; 
+
+            iceSize = iceInitialSize;
+            puddleWidth = 0;
+            puddleHeight = 0; 
+            phase = 'melting';
+        }
+
+        function drawIce() {
+            if (iceSize > 0) {
+                ctx.fillStyle = '#a0e0ff'; 
+                ctx.strokeStyle = '#60c0ff'; 
+                ctx.lineWidth = 2;
+                
+                const baseX = (canvas.width - iceSize) / 2; 
+                // iceY is the Y coordinate of the top-front edge of the cube.
+                // The bottom of the ice cube will be at iceBottomY.
+                const iceTopFrontY = iceBottomY - iceSize; 
+
+                const pOffsetX = iceSize * 0.3; 
+                const pOffsetY = iceSize * 0.15; // Perspective offset for the top face
+
+                // Front Face
+                ctx.beginPath();
+                // The front face's top edge is at iceTopFrontY. Its bottom edge will be at iceBottomY.
+                ctx.rect(baseX, iceTopFrontY, iceSize, iceSize);
+                ctx.fill();
+                ctx.stroke();
+
+                // Top Face
+                ctx.beginPath();
+                ctx.moveTo(baseX, iceTopFrontY); // Top-left-front
+                ctx.lineTo(baseX + pOffsetX, iceTopFrontY - pOffsetY); // Top-left-back
+                ctx.lineTo(baseX + iceSize + pOffsetX, iceTopFrontY - pOffsetY); // Top-right-back
+                ctx.lineTo(baseX + iceSize, iceTopFrontY); // Top-right-front
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                // Side Face (Right)
+                // The bottom-front Y of this face is iceBottomY.
+                // The bottom-back Y of this face is iceBottomY - pOffsetY (due to perspective of the chosen ice cube style).
+                ctx.beginPath();
+                ctx.moveTo(baseX + iceSize, iceTopFrontY); // Top-right-front
+                ctx.lineTo(baseX + iceSize + pOffsetX, iceTopFrontY - pOffsetY); // Top-right-back
+                ctx.lineTo(baseX + iceSize + pOffsetX, iceBottomY - pOffsetY); // Bottom-right-back
+                ctx.lineTo(baseX + iceSize, iceBottomY); // Bottom-right-front
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+
+        function drawPuddle() {
+            if (puddleWidth > 0 && puddleHeight > 0) {
+                ctx.fillStyle = '#60c0ff'; 
+                ctx.beginPath();
+                
+                const puddleCenterX = canvas.width / 2;
+                // The puddle's Y-center is calculated so its TOP edge aligns with groundLevel.
+                // The puddle will extend downwards from groundLevel.
+                const ellipseCenterY = groundLevel + (puddleHeight / 2); 
+
+                ctx.ellipse(
+                    puddleCenterX,                          
+                    ellipseCenterY,
+                    puddleWidth / 2,                        
+                    puddleHeight / 2,                       
+                    0,                                      
+                    0,                                      
+                    Math.PI * 2                             
+                );
+                ctx.fill();
+            }
+        }
+
+        function drawGround() {
+            ctx.fillStyle = '#d2b48c'; 
+            ctx.fillRect(0, groundLevel, canvas.width, canvas.height - groundLevel);
+        }
+        
+        function drawSun() {
+            const sunRadius = Math.min(canvas.width, canvas.height) * 0.08;
+            const sunX = canvas.width * 0.85;
+            const sunY = canvas.height * 0.15; 
+
+            ctx.fillStyle = '#FFD700'; 
+            ctx.beginPath();
+            ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            const rayCount = 8;
+            const rayOuterRadius = sunRadius + Math.min(canvas.width, canvas.height) * 0.1;
+            const rayInnerRadius = sunRadius + 5;
+
+            for (let i = 0; i < rayCount; i++) {
+                const angle = (i / rayCount) * Math.PI * 2;
+                const startX = sunX + Math.cos(angle) * rayInnerRadius;
+                const startY = sunY + Math.sin(angle) * rayInnerRadius;
+                const endX = sunX + Math.cos(angle) * rayOuterRadius;
+                const endY = sunY + Math.sin(angle) * rayOuterRadius;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        function update() {
+            if (phase === 'melting') {
+                iceSize -= 0.2; 
+                let meltedAmountFactor = (iceInitialSize - iceSize) / iceInitialSize; 
+                puddleWidth = puddleMaxWidth * meltedAmountFactor * 0.8; 
+                puddleHeight = puddleMaxHeight * meltedAmountFactor;
+
+                if (iceSize <= 0) {
+                    iceSize = 0;
+                    puddleWidth = Math.min(puddleWidth, puddleMaxWidth); 
+                    puddleHeight = Math.min(puddleHeight, puddleMaxHeight); 
+                    phase = 'puddle_stable';
+                    setTimeout(() => {
+                        if (phase === 'puddle_stable') phase = 'evaporating';
+                    }, 2000); 
+                }
+            } else if (phase === 'puddle_stable') {
+                // Puddle remains stable
+            } else if (phase === 'evaporating') {
+                puddleWidth -= evaporationRate * 2; 
+                puddleHeight -= evaporationRate;   
+
+                if (puddleWidth <= 0 || puddleHeight <= 0) {
+                    puddleWidth = 0;
+                    puddleHeight = 0;
+                    phase = 'done';
+                    restartButton.classList.add('visible'); 
+                }
+            }
+
+            puddleWidth = Math.max(0, Math.min(puddleWidth, puddleMaxWidth));
+            puddleHeight = Math.max(0, Math.min(puddleHeight, puddleMaxHeight));
+        }
+
+        function gameLoop() {
+            if (typeof iceBottomY === 'undefined') { // Check if params are initialized
+                initializeAnimationParameters();
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawSun();
+            drawGround(); 
+            drawPuddle(); 
+            drawIce();    
+            
+            if (phase !== 'done') {
+                update();
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function restartAnimation() {
+            cancelAnimationFrame(animationFrameId);
+            initializeAnimationParameters(); 
+            restartButton.classList.remove('visible'); 
+            gameLoop();
+        }
+
+        restartButton.addEventListener('click', restartAnimation);
+
+        resizeCanvas(); 
+        gameLoop();
+    </script>
+</body>
+</html>
