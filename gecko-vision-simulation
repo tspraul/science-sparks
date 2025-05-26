@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gecko Vision Model</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #1f2937;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem; 
+        }
+        .slider-container label {
+            min-width: 150px; 
+            margin-right: 1rem;
+            font-size: 0.875rem;
+        }
+        .slider-container input[type="range"] {
+            flex-grow: 1;
+            accent-color: #3b82f6;
+        }
+        .slider-container span {
+            min-width: 40px; 
+            text-align: right;
+            font-size: 0.875rem;
+            margin-left: 0.5rem;
+        }
+        .canvas-wrapper {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            background-color: #ffffff; 
+        }
+        .section-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #4b5563;
+            text-align: center;
+            margin-top: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl bg-white p-4 sm:p-6 rounded-lg shadow-xl">
+        <h1 class="text-xl sm:text-2xl font-bold text-center text-gray-700 mb-4 sm:mb-6">Gecko Vision Simulator</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="slider-container">
+                <label for="lightAngle">Light Angle:</label>
+                <input type="range" id="lightAngle" min="0" max="360" value="45" class="w-full">
+                <span id="lightAngleValue">45°</span>
+            </div>
+            <div class="slider-container">
+                <label for="lightIntensity">Light Intensity:</label>
+                <input type="range" id="lightIntensity" min="0" max="100" value="80" class="w-full">
+                <span id="lightIntensityValue">80%</span>
+            </div>
+            <div class="slider-container">
+                <label for="receptorSensitivity">Receptor Sensitivity:</label>
+                <input type="range" id="receptorSensitivity" min="0" max="100" value="70" class="w-full">
+                <span id="receptorSensitivityValue">70%</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <p class="section-title">World View</p>
+                <div class="canvas-wrapper">
+                    <canvas id="worldCanvas"></canvas>
+                </div>
+            </div>
+            <div>
+                <p class="section-title">Gecko's Perception</p>
+                <div class="canvas-wrapper">
+                    <canvas id="geckoViewCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const worldCanvas = document.getElementById('worldCanvas');
+        const worldCtx = worldCanvas.getContext('2d');
+        const geckoViewCanvas = document.getElementById('geckoViewCanvas');
+        const geckoViewCtx = geckoViewCanvas.getContext('2d');
+
+        const lightAngleSlider = document.getElementById('lightAngle');
+        const lightIntensitySlider = document.getElementById('lightIntensity');
+        const receptorSensitivitySlider = document.getElementById('receptorSensitivity');
+        const lightAngleValue = document.getElementById('lightAngleValue');
+        const lightIntensityValue = document.getElementById('lightIntensityValue');
+        const receptorSensitivityValue = document.getElementById('receptorSensitivityValue');
+
+        let canvasWidth, canvasHeight;
+
+        function setupCanvases() {
+            const parentWidth = worldCanvas.parentElement.clientWidth;
+            canvasWidth = Math.min(parentWidth, 350);
+            canvasHeight = canvasWidth; 
+            
+            worldCanvas.width = canvasWidth;
+            worldCanvas.height = canvasHeight;
+            geckoViewCanvas.width = canvasWidth;
+            geckoViewCanvas.height = canvasHeight;
+            drawAll();
+        }
+
+        const insectDetails = {
+            bodyColor: '#D92323', 
+            headColor: '#333333', 
+            spotColor: '#000000', 
+            numSpots: 6, // Adjusted for better distribution
+            antennaColor: '#555555',
+            legColor: '#444444'
+        };
+
+        function drawGecko(ctx, lightIntensity) {
+            const geckoBaseX = canvasWidth * 0.2;
+            const geckoBaseY = canvasHeight * 0.75;
+            const bodyWidth = canvasWidth * 0.3;
+            const bodyHeight = canvasWidth * 0.15;
+            const headRadius = bodyWidth * 0.22;
+            const tailLength = bodyWidth * 0.5;
+            const tailWidth = bodyHeight * 0.5;
+
+            ctx.strokeStyle = '#2E8B57'; // SeaGreen for outlines
+            ctx.lineWidth = 2;
+
+            // Tail
+            ctx.fillStyle = '#7CCD7C'; // Lighter green for tail
+            ctx.beginPath();
+            ctx.moveTo(geckoBaseX + bodyWidth * 0.45, geckoBaseY);
+            ctx.quadraticCurveTo(geckoBaseX + bodyWidth * 0.5 + tailLength * 0.5, geckoBaseY + tailWidth * 0.5, 
+                                 geckoBaseX + bodyWidth * 0.4 + tailLength, geckoBaseY);
+            ctx.quadraticCurveTo(geckoBaseX + bodyWidth * 0.5 + tailLength * 0.5, geckoBaseY - tailWidth * 0.5, 
+                                 geckoBaseX + bodyWidth * 0.45, geckoBaseY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Body
+            ctx.fillStyle = '#90EE90'; // Light green
+            ctx.beginPath();
+            ctx.ellipse(geckoBaseX, geckoBaseY, bodyWidth / 2, bodyHeight / 2, Math.PI * -0.05, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Simple Legs (two pairs)
+            const legLength = bodyHeight * 0.7;
+            const legWidth = bodyWidth * 0.05;
+            ctx.fillStyle = '#7CCD7C';
+            // Front legs
+            ctx.fillRect(geckoBaseX - bodyWidth * 0.25, geckoBaseY + bodyHeight * 0.3, legWidth, legLength);
+            ctx.fillRect(geckoBaseX - bodyWidth * 0.15, geckoBaseY + bodyHeight * 0.35, legWidth, legLength);
+            // Back legs
+            ctx.fillRect(geckoBaseX + bodyWidth * 0.15, geckoBaseY + bodyHeight * 0.3, legWidth, legLength);
+            ctx.fillRect(geckoBaseX + bodyWidth * 0.25, geckoBaseY + bodyHeight * 0.35, legWidth, legLength);
+
+
+            // Head
+            const headX = geckoBaseX - bodyWidth * 0.42;
+            const headY = geckoBaseY - bodyHeight * 0.1;
+            ctx.beginPath();
+            ctx.arc(headX, headY, headRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#90EE90';
+            ctx.fill();
+            ctx.stroke();
+
+            // Eye on head
+            const eyeX = headX - headRadius * 0.05; // Slightly more centered
+            const eyeY = headY - headRadius * 0.1;
+            const eyeOuterRadius = headRadius * 0.6;
+            
+            ctx.fillStyle = '#F0E68C'; 
+            ctx.beginPath();
+            ctx.arc(eyeX, eyeY, eyeOuterRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#8B4513';
+            ctx.stroke();
+            
+            ctx.fillStyle = '#DAA520'; 
+            ctx.beginPath();
+            ctx.arc(eyeX, eyeY, eyeOuterRadius * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pupil
+            const maxPupilHeight = eyeOuterRadius * 1.5;
+            const minPupilWidth = eyeOuterRadius * 0.1;
+            const maxPupilWidth = eyeOuterRadius * 0.5;
+            const intensityFactor = lightIntensity / 100;
+            let pupilWidth = maxPupilWidth - (intensityFactor * (maxPupilWidth - minPupilWidth));
+            pupilWidth = Math.max(minPupilWidth * 1.5, pupilWidth);
+
+            ctx.fillStyle = 'black';
+            if (intensityFactor > 0.75) {
+                const numPinholes = 3;
+                const pinholeRadius = Math.max(1, pupilWidth * 0.5);
+                const pinholeSpacing = maxPupilHeight / (numPinholes + 0.5);
+                for (let i = 0; i < numPinholes; i++) {
+                    ctx.beginPath();
+                    ctx.arc(eyeX, eyeY - (maxPupilHeight / 2) + pinholeSpacing * (i + 0.75) , pinholeRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else {
+                ctx.beginPath();
+                ctx.ellipse(eyeX, eyeY, pupilWidth / 2, maxPupilHeight / 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            return { x: eyeX, y: eyeY }; 
+        }
+
+        function drawInsect(ctx, x, y, lightAngleRad, lightIntensityFactor, forPerception = false, receptorSensitivityFactor = 1) {
+            const bodyRadiusX = forPerception ? canvasWidth * 0.18 : canvasWidth * 0.1;
+            const bodyRadiusY = forPerception ? canvasWidth * 0.14 : canvasWidth * 0.08;
+            const headRadius = bodyRadiusX * 0.35;
+            const legLength = bodyRadiusY * 0.8;
+            const legWidth = bodyRadiusX * 0.05;
+            const antennaLength = headRadius * 1.2;
+
+            let finalBodyColor = insectDetails.bodyColor;
+            let finalHeadColor = insectDetails.headColor;
+            let finalSpotColor = insectDetails.spotColor;
+            let finalAntennaColor = insectDetails.antennaColor;
+            let finalLegColor = insectDetails.legColor;
+            let overallAlpha = 1.0;
+            let highlightColor = 'rgba(255, 255, 255, 0)'; // Transparent by default
+
+            const angleToLight = Math.atan2(y - (canvasHeight/2 + canvasHeight * 0.35 * Math.sin(lightAngleRad)), x - (canvasWidth/2 + canvasWidth * 0.35 * Math.cos(lightAngleRad)));
+            const insectOrientation = Math.PI / 2; // Assuming insect faces 'up' on canvas initially
+
+            if (forPerception) {
+                let perceivedBrightness = lightIntensityFactor;
+                const angleDifference = Math.abs(normalizeAngle(insectOrientation - (lightAngleRad - Math.PI))); // Light hitting from opposite direction
+                let directionalFactor = 0.5 + 0.5 * Math.cos(angleDifference); // Brighter if light is head-on
+                directionalFactor = Math.max(0.15, directionalFactor); 
+                perceivedBrightness *= directionalFactor;
+                
+                const effectiveLight = lightIntensityFactor * receptorSensitivityFactor;
+                finalBodyColor = adjustColor(insectDetails.bodyColor, perceivedBrightness, effectiveLight);
+                finalHeadColor = adjustColor(insectDetails.headColor, perceivedBrightness * 0.8, effectiveLight * 0.8);
+                finalSpotColor = adjustColor(insectDetails.spotColor, perceivedBrightness * 0.5, effectiveLight * 0.5);
+                finalAntennaColor = adjustColor(insectDetails.antennaColor, perceivedBrightness * 0.7, effectiveLight * 0.7);
+                finalLegColor = adjustColor(insectDetails.legColor, perceivedBrightness * 0.6, effectiveLight * 0.6);
+                
+                if (effectiveLight < 0.15) overallAlpha = 0.4 + effectiveLight * 2;
+                else if (effectiveLight < 0.3) overallAlpha = 0.6 + effectiveLight;
+            } else { // World View - add highlight
+                const angleDifferenceHighlight = Math.abs(normalizeAngle(insectOrientation - (lightAngleRad - Math.PI)));
+                const highlightIntensity = (0.5 + 0.5 * Math.cos(angleDifferenceHighlight)) * lightIntensityFactor;
+                if (highlightIntensity > 0.3) {
+                    highlightColor = `rgba(255, 255, 220, ${Math.min(0.5, highlightIntensity * 0.5)})`;
+                }
+            }
+
+            ctx.globalAlpha = overallAlpha;
+            ctx.lineWidth = forPerception ? 1 : 1.5;
+
+            // Legs (draw first, so body is on top)
+            ctx.strokeStyle = finalLegColor;
+            ctx.beginPath(); // Leg pair 1
+            ctx.moveTo(x - bodyRadiusX * 0.3, y + bodyRadiusY * 0.5); ctx.lineTo(x - bodyRadiusX * 0.4, y + bodyRadiusY * 0.5 + legLength);
+            ctx.moveTo(x + bodyRadiusX * 0.3, y + bodyRadiusY * 0.5); ctx.lineTo(x + bodyRadiusX * 0.4, y + bodyRadiusY * 0.5 + legLength);
+            ctx.stroke();
+            ctx.beginPath(); // Leg pair 2
+            ctx.moveTo(x - bodyRadiusX * 0.1, y + bodyRadiusY * 0.6); ctx.lineTo(x - bodyRadiusX * 0.15, y + bodyRadiusY * 0.6 + legLength * 1.1);
+            ctx.moveTo(x + bodyRadiusX * 0.1, y + bodyRadiusY * 0.6); ctx.lineTo(x + bodyRadiusX * 0.15, y + bodyRadiusY * 0.6 + legLength * 1.1);
+            ctx.stroke();
+             ctx.beginPath(); // Leg pair 3
+            ctx.moveTo(x - bodyRadiusX * 0.5, y + bodyRadiusY * 0.2); ctx.lineTo(x - bodyRadiusX * 0.6, y + bodyRadiusY * 0.2 + legLength * 0.9);
+            ctx.moveTo(x + bodyRadiusX * 0.5, y + bodyRadiusY * 0.2); ctx.lineTo(x + bodyRadiusX * 0.6, y + bodyRadiusY * 0.2 + legLength * 0.9);
+            ctx.stroke();
+
+
+            // Body
+            ctx.fillStyle = finalBodyColor;
+            ctx.beginPath();
+            ctx.ellipse(x, y, bodyRadiusX, bodyRadiusY, 0, 0, Math.PI * 2);
+            ctx.fill();
+            if (highlightColor !== 'rgba(255, 255, 255, 0)') { // Apply highlight in World View
+                const gradX = x - bodyRadiusX * 0.3 * Math.cos(lightAngleRad - Math.PI); // Position gradient towards light
+                const gradY = y - bodyRadiusY * 0.3 * Math.sin(lightAngleRad - Math.PI);
+                const highlightGradient = ctx.createRadialGradient(gradX, gradY, 0, gradX, gradY, bodyRadiusX * 0.8);
+                highlightGradient.addColorStop(0, highlightColor);
+                highlightGradient.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = highlightGradient;
+                ctx.fill();
+            }
+            ctx.strokeStyle = forPerception ? 'rgba(50,50,50,0.3)' : insectDetails.headColor;
+            ctx.stroke();
+
+            // Elytra line
+            ctx.beginPath();
+            ctx.moveTo(x, y - bodyRadiusY);
+            ctx.lineTo(x, y + bodyRadiusY);
+            ctx.strokeStyle = forPerception ? adjustColor(insectDetails.headColor, 0.5, 0.5) : insectDetails.headColor;
+            ctx.stroke();
+
+
+            // Head
+            const headX = x - bodyRadiusX * 0.9; // Position head more forward
+            ctx.fillStyle = finalHeadColor;
+            ctx.beginPath();
+            ctx.arc(headX, y, headRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = forPerception ? 'rgba(50,50,50,0.3)' : insectDetails.spotColor;
+            ctx.stroke();
+            
+            // Antennae
+            ctx.strokeStyle = finalAntennaColor;
+            ctx.beginPath();
+            ctx.moveTo(headX - headRadius * 0.7, y - headRadius * 0.3);
+            ctx.quadraticCurveTo(headX - headRadius * 1.5, y - headRadius * 1.2, headX - headRadius * 1.2, y - headRadius * 1.5 - antennaLength);
+            ctx.moveTo(headX - headRadius * 0.7, y + headRadius * 0.3);
+            ctx.quadraticCurveTo(headX - headRadius * 1.5, y + headRadius * 1.2, headX - headRadius * 1.2, y + headRadius * 1.5 + antennaLength);
+            ctx.stroke();
+
+            // Spots
+            ctx.fillStyle = finalSpotColor;
+            const spotRadius = bodyRadiusX * 0.12;
+            const spotPositions = [ // Symmetrical spots
+                { dx: 0.3, dy: 0 }, { dx: -0.3, dy: 0 }, 
+                { dx: 0.5, dy: 0.45 }, { dx: 0.5, dy: -0.45 },
+                { dx: 0, dy: 0.55 }, { dx: 0, dy: -0.55 }
+            ];
+            spotPositions.slice(0, insectDetails.numSpots).forEach(pos => {
+                ctx.beginPath();
+                ctx.arc(x + pos.dx * bodyRadiusX, y + pos.dy * bodyRadiusY, spotRadius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            ctx.globalAlpha = 1.0;
+        }
+        
+        function normalizeAngle(angle) {
+            while (angle < 0) angle += Math.PI * 2;
+            while (angle >= Math.PI * 2) angle -= Math.PI * 2;
+            return angle;
+        }
+
+        function adjustColor(hexColor, brightnessFactor, saturationFactor) {
+            let r = parseInt(hexColor.slice(1, 3), 16);
+            let g = parseInt(hexColor.slice(3, 5), 16);
+            let b = parseInt(hexColor.slice(5, 7), 16);
+
+            r *= brightnessFactor; g *= brightnessFactor; b *= brightnessFactor;
+            const gray = (r + g + b) / 3;
+            const satMix = Math.max(0, Math.min(1, saturationFactor * 1.5));
+            r = r * satMix + gray * (1 - satMix);
+            g = g * satMix + gray * (1 - satMix);
+            b = b * satMix + gray * (1 - satMix);
+            r = Math.min(255, Math.max(0, Math.round(r)));
+            g = Math.min(255, Math.max(0, Math.round(g)));
+            b = Math.min(255, Math.max(0, Math.round(b)));
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function drawLightSource(ctx, centerX, centerY, distance, angleRad, intensityFactor) {
+            const lightX = centerX + distance * Math.cos(angleRad);
+            const lightY = centerY + distance * Math.sin(angleRad);
+            const baseRadius = canvasWidth * 0.04;
+            const lightRadius = baseRadius * (0.5 + intensityFactor * 0.7);
+
+            const haloGradient = ctx.createRadialGradient(lightX, lightY, lightRadius * 0.5, lightX, lightY, lightRadius * 2.5);
+            haloGradient.addColorStop(0, `rgba(255, 255, 150, ${0.2 * intensityFactor + 0.1})`);
+            haloGradient.addColorStop(1, `rgba(255, 255, 150, 0)`);
+            ctx.fillStyle = haloGradient;
+            ctx.beginPath();
+            ctx.arc(lightX, lightY, lightRadius * 2.5, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(lightX, lightY, lightRadius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 224, ${0.5 + intensityFactor * 0.5})`;
+            ctx.fill();
+            ctx.strokeStyle = `rgba(255, 223, 186, ${0.3 + intensityFactor * 0.7})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            return { x: lightX, y: lightY }; 
+        }
+
+        function drawLightBeams(ctx, lightPos, insectPos, geckoEyePos, intensityFactor) {
+            const beamOpacity = 0.1 + 0.4 * intensityFactor; // Slightly more visible beams
+
+            // Beam from light source to insect (center)
+            ctx.beginPath();
+            ctx.moveTo(lightPos.x, lightPos.y);
+            ctx.lineTo(insectPos.x, insectPos.y);
+            ctx.strokeStyle = `rgba(255, 255, 0, ${beamOpacity * 0.8})`; 
+            ctx.lineWidth = 1 + 2.5 * intensityFactor;
+            ctx.stroke();
+
+            // Multiple "reflected" beams from insect to gecko eye
+            const numReflectedBeams = 3;
+            const spreadAngle = Math.PI / 12; // Spread of reflected beams
+            const angleToGecko = Math.atan2(geckoEyePos.y - insectPos.y, geckoEyePos.x - insectPos.x);
+
+            for (let i = 0; i < numReflectedBeams; i++) {
+                const angle = angleToGecko - spreadAngle / 2 + (i / (numReflectedBeams -1 + (numReflectedBeams===1?1:0) )) * spreadAngle ; // Avoid division by zero if 1 beam
+                const beamEndX = insectPos.x + Math.cos(angle) * canvasWidth; // Extend far
+                const beamEndY = insectPos.y + Math.sin(angle) * canvasWidth;
+
+                ctx.beginPath();
+                ctx.moveTo(insectPos.x, insectPos.y); // Start from insect center for simplicity
+                
+                // Simple intersection with gecko eye (approximate)
+                const distToEye = Math.sqrt(Math.pow(geckoEyePos.x - insectPos.x, 2) + Math.pow(geckoEyePos.y - insectPos.y, 2));
+                const intersectX = insectPos.x + Math.cos(angle) * distToEye;
+                const intersectY = insectPos.y + Math.sin(angle) * distToEye;
+
+                ctx.lineTo(intersectX, intersectY);
+                ctx.strokeStyle = `rgba(220, 220, 220, ${beamOpacity * 0.6})`; 
+                ctx.lineWidth = 1 + 1.5 * intensityFactor;
+                ctx.stroke();
+            }
+        }
+
+        function drawAll() {
+            const lightAngle = parseInt(lightAngleSlider.value);
+            const lightIntensity = parseInt(lightIntensitySlider.value);
+            const receptorSensitivity = parseInt(receptorSensitivitySlider.value);
+
+            lightAngleValue.textContent = `${lightAngle}°`;
+            lightIntensityValue.textContent = `${lightIntensity}%`;
+            receptorSensitivityValue.textContent = `${receptorSensitivity}%`;
+
+            const lightAngleRad = (lightAngle * Math.PI) / 180;
+            const lightIntensityFactor = lightIntensity / 100;
+            const receptorSensitivityFactor = receptorSensitivity / 100;
+
+            worldCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+            geckoViewCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            worldCtx.fillStyle = '#ADD8E6'; 
+            worldCtx.fillRect(0,0,canvasWidth, canvasHeight);
+
+            const worldInsectCenterX = canvasWidth * 0.65; // Move insect slightly to the right
+            const worldInsectCenterY = canvasHeight / 2;
+            const lightDist = canvasWidth * 0.35; // Distance of light source from insect
+
+            const geckoEyePos = drawGecko(worldCtx, lightIntensity); 
+            const lightSourcePos = drawLightSource(worldCtx, worldInsectCenterX, worldInsectCenterY, lightDist, lightAngleRad, lightIntensityFactor);
+            
+            drawLightBeams(worldCtx, lightSourcePos, {x: worldInsectCenterX, y: worldInsectCenterY}, geckoEyePos, lightIntensityFactor);
+            drawInsect(worldCtx, worldInsectCenterX, worldInsectCenterY, lightAngleRad, lightIntensityFactor, false);
+
+
+            const geckoViewObjectX = canvasWidth / 2;
+            const geckoViewObjectY = canvasHeight / 2;
+            const backgroundBrightness = Math.max(10, Math.round(20 + lightIntensityFactor * receptorSensitivityFactor * 50));
+            geckoViewCtx.fillStyle = `rgb(${backgroundBrightness},${backgroundBrightness},${backgroundBrightness + 10})`;
+            geckoViewCtx.fillRect(0,0, canvasWidth, canvasHeight);
+            drawInsect(geckoViewCtx, geckoViewObjectX, geckoViewObjectY, lightAngleRad, lightIntensityFactor, true, receptorSensitivityFactor);
+        }
+
+        lightAngleSlider.addEventListener('input', drawAll);
+        lightIntensitySlider.addEventListener('input', drawAll);
+        receptorSensitivitySlider.addEventListener('input', drawAll);
+        
+        window.addEventListener('resize', setupCanvases);
+        setTimeout(setupCanvases, 50); 
+    </script>
+</body>
+</html>
