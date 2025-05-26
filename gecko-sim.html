@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gecko Vision Simulation</title>
+    <title>Gecko Light Physics Simulation</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,7 +12,7 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
-        h1 {
+        h1, h2, h3 {
             color: #2c3e50;
             text-align: center;
         }
@@ -26,35 +26,17 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             margin-bottom: 20px;
         }
-        .canvas-container {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 20px;
-            margin: 20px 0;
-        }
         canvas {
             border: 1px solid #ddd;
             border-radius: 4px;
+            margin: 10px;
         }
         .controls {
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
             justify-content: center;
-            margin-bottom: 20px;
-        }
-        button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #2980b9;
+            margin: 20px 0;
         }
         .slider-container {
             display: flex;
@@ -71,226 +53,225 @@
     </style>
 </head>
 <body>
-    <h1>Gecko Vision Simulation</h1>
+    <h1>Gecko Light Physics Simulation</h1>
     
     <div class="simulation-container">
-        <h2>Basic Gecko Vision</h2>
         <div class="description">
-            <p>This simulation demonstrates how geckos might perceive the world differently from humans. 
-               The left image shows a scene as humans would see it, while the right shows the same scene 
-               as a gecko might perceive it, with enhanced blue-green sensitivity and improved night vision.</p>
+            <p>This simulation demonstrates how light intensity, reflection angles, and pupil size affect a gecko's vision.
+               Watch how light rays bounce off prey and enter the gecko's eye through its adjustable pupil.</p>
         </div>
         
         <div class="controls">
-            <button id="generateScene">Generate New Scene</button>
             <div class="slider-container">
-                <label for="nightVision">Night Vision Strength:</label>
-                <input type="range" id="nightVision" min="1" max="3" step="0.1" value="1.5">
-                <span id="nightVisionValue">1.5</span>
+                <label for="lightIntensity">Light Intensity:</label>
+                <input type="range" id="lightIntensity" min="0.1" max="1" step="0.1" value="0.6">
+                <span id="lightIntensityValue">0.6</span>
             </div>
+            
             <div class="slider-container">
-                <label for="colorSensitivity">Color Sensitivity:</label>
-                <input type="range" id="colorSensitivity" min="0.5" max="2" step="0.1" value="1.2">
-                <span id="colorSensitivityValue">1.2</span>
+                <label for="pupilSize">Pupil Size:</label>
+                <input type="range" id="pupilSize" min="0.1" max="1" step="0.1" value="0.5">
+                <span id="pupilSizeValue">0.5</span>
+            </div>
+            
+            <div class="slider-container">
+                <label for="reflectivity">Prey Reflectivity:</label>
+                <input type="range" id="reflectivity" min="0.1" max="1" step="0.1" value="0.7">
+                <span id="reflectivityValue">0.7</span>
             </div>
         </div>
         
-        <div class="canvas-container">
-            <div>
-                <h3>Human Vision</h3>
-                <canvas id="humanCanvas" width="500" height="500"></canvas>
-            </div>
-            <div>
-                <h3>Gecko Vision</h3>
-                <canvas id="geckoCanvas" width="500" height="500"></canvas>
-            </div>
-        </div>
+        <canvas id="simulationCanvas" width="800" height="500"></canvas>
     </div>
 
     <script>
-        // Get canvas elements and contexts
-        const humanCanvas = document.getElementById('humanCanvas');
-        const geckoCanvas = document.getElementById('geckoCanvas');
-        const humanCtx = humanCanvas.getContext('2d');
-        const geckoCtx = geckoCanvas.getContext('2d');
+        // Get canvas and context
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
         
         // Get controls
-        const generateButton = document.getElementById('generateScene');
-        const nightVisionSlider = document.getElementById('nightVision');
-        const nightVisionValue = document.getElementById('nightVisionValue');
-        const colorSensitivitySlider = document.getElementById('colorSensitivity');
-        const colorSensitivityValue = document.getElementById('colorSensitivityValue');
+        const lightIntensitySlider = document.getElementById('lightIntensity');
+        const lightIntensityValue = document.getElementById('lightIntensityValue');
+        const pupilSizeSlider = document.getElementById('pupilSize');
+        const pupilSizeValue = document.getElementById('pupilSizeValue');
+        const reflectivitySlider = document.getElementById('reflectivity');
+        const reflectivityValue = document.getElementById('reflectivityValue');
         
         // Scene parameters
-        const width = humanCanvas.width;
-        const height = humanCanvas.height;
-        let scene = [];
+        const width = canvas.width;
+        const height = canvas.height;
         
-        // Initialize scene data
-        function initializeScene() {
-            scene = [];
-            for (let y = 0; y < height; y++) {
-                const row = [];
-                for (let x = 0; x < width; x++) {
-                    // Dark background
-                    row.push([0, 0, 0]);
+        // Gecko and prey positions
+        const geckoX = width - 150;
+        const geckoY = height / 2;
+        const geckoSize = 80;
+        
+        const preyPositions = [
+            { x: 150, y: height / 2 - 80, size: 20, color: '#8BC34A' },
+            { x: 200, y: height / 2, size: 25, color: '#4CAF50' },
+            { x: 150, y: height / 2 + 80, size: 15, color: '#009688' }
+        ];
+        
+        // Light source position
+        const lightX = 50;
+        const lightY = 50;
+        
+        // Function to draw the scene
+        function drawScene() {
+            // Clear canvas
+            ctx.clearRect(0, 0, width, height);
+            
+            // Get current values from sliders
+            const lightIntensity = parseFloat(lightIntensitySlider.value);
+            const pupilSize = parseFloat(pupilSizeSlider.value);
+            const reflectivity = parseFloat(reflectivitySlider.value);
+            
+            // Draw background (darker based on light intensity)
+            ctx.fillStyle = `rgba(20, 20, 40, ${1 - lightIntensity * 0.7})`;
+            ctx.fillRect(0, 0, width, height);
+            
+            // Draw light source
+            const gradientRadius = lightIntensity * 200;
+            const gradient = ctx.createRadialGradient(
+                lightX, lightY, 0,
+                lightX, lightY, gradientRadius
+            );
+            gradient.addColorStop(0, `rgba(255, 255, 200, ${lightIntensity})`);
+            gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(lightX, lightY, gradientRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw gecko
+            ctx.fillStyle = '#607D8B';
+            ctx.beginPath();
+            ctx.arc(geckoX, geckoY, geckoSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw gecko eye
+            ctx.fillStyle = '#37474F';
+            ctx.beginPath();
+            ctx.arc(geckoX - 20, geckoY - 20, 15, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw gecko pupil (vertical slit that changes with light)
+            const pupilWidth = 5 * pupilSize;
+            const pupilHeight = 20 * pupilSize;
+            
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.ellipse(
+                geckoX - 20, 
+                geckoY - 20, 
+                pupilWidth / 2, 
+                pupilHeight / 2, 
+                0, 0, Math.PI * 2
+            );
+            ctx.fill();
+            
+            // Draw prey items
+            preyPositions.forEach(prey => {
+                ctx.fillStyle = prey.color;
+                ctx.beginPath();
+                ctx.arc(prey.x, prey.y, prey.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw light rays from light source to prey
+                ctx.strokeStyle = `rgba(255, 255, 200, ${lightIntensity * 0.5})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(lightX, lightY);
+                ctx.lineTo(prey.x, prey.y);
+                ctx.stroke();
+                
+                // Calculate reflection angle (simplified physics)
+                const dx = prey.x - lightX;
+                const dy = prey.y - lightY;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const normalizedDx = dx / length;
+                const normalizedDy = dy / length;
+                
+                // Draw reflected light rays from prey to gecko eye
+                // The brightness depends on reflectivity and light intensity
+                const rayBrightness = lightIntensity * reflectivity;
+                
+                // Only draw rays that would be visible based on pupil size
+                if (rayBrightness > 0.2 || pupilSize > 0.3) {
+                    ctx.strokeStyle = `rgba(255, 255, 200, ${rayBrightness})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(prey.x, prey.y);
+                    ctx.lineTo(geckoX - 20, geckoY - 20); // Gecko eye position
+                    ctx.stroke();
+                    
+                    // Draw light cone to represent the field of view
+                    // that can enter the pupil based on its size
+                    const coneOpacity = pupilSize * rayBrightness;
+                    const gradient2 = ctx.createLinearGradient(
+                        prey.x, prey.y,
+                        geckoX - 20, geckoY - 20
+                    );
+                    gradient2.addColorStop(0, `rgba(255, 255, 200, ${coneOpacity})`);
+                    gradient2.addColorStop(1, `rgba(255, 255, 200, 0)`);
+                    
+                    ctx.fillStyle = gradient2;
+                    ctx.beginPath();
+                    ctx.moveTo(prey.x, prey.y);
+                    
+                    // The cone width is based on pupil size
+                    const angle = Math.atan2(geckoY - 20 - prey.y, geckoX - 20 - prey.x);
+                    const coneWidth = pupilSize * 0.2;
+                    
+                    ctx.lineTo(
+                        prey.x + Math.cos(angle + coneWidth) * prey.size,
+                        prey.y + Math.sin(angle + coneWidth) * prey.size
+                    );
+                    
+                    ctx.lineTo(geckoX - 20, geckoY - 20);
+                    
+                    ctx.lineTo(
+                        prey.x + Math.cos(angle - coneWidth) * prey.size,
+                        prey.y + Math.sin(angle - coneWidth) * prey.size
+                    );
+                    
+                    ctx.closePath();
+                    ctx.fill();
                 }
-                scene.push(row);
-            }
+            });
+            
+            // Add information text
+            ctx.fillStyle = 'white';
+            ctx.font = '14px Arial';
+            ctx.fillText(`Light Intensity: ${lightIntensity.toFixed(1)}`, 20, height - 60);
+            ctx.fillText(`Pupil Size: ${pupilSize.toFixed(1)}`, 20, height - 40);
+            ctx.fillText(`Prey Reflectivity: ${reflectivity.toFixed(1)}`, 20, height - 20);
+            
+            // Add explanation of what's happening
+            ctx.fillText('Light rays bounce off prey and enter gecko eye through pupil', width / 2 - 180, 30);
+            ctx.fillText('Pupil size adjusts based on light conditions', width / 2 - 120, 50);
         }
         
-        // Generate a random scene
-        function generateScene() {
-            initializeScene();
-            
-            // Add stars (random bright dots)
-            for (let i = 0; i < 300; i++) {
-                const x = Math.floor(Math.random() * width);
-                const y = Math.floor(Math.random() * height);
-                if (Math.random() > 0.7) {
-                    scene[y][x] = [1, 1, 1]; // White star
-                }
-            }
-            
-            // Add a moon
-            const moonX = Math.floor(Math.random() * (width - 100)) + 50;
-            const moonY = Math.floor(Math.random() * (height - 100)) + 50;
-            const moonRadius = Math.floor(Math.random() * 20) + 30;
-            
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const distance = Math.sqrt((x - moonX) ** 2 + (y - moonY) ** 2);
-                    if (distance < moonRadius) {
-                        scene[y][x] = [0.8, 0.8, 0.8]; // Gray moon
-                    }
-                }
-            }
-            
-            // Add insects (prey)
-            for (let i = 0; i < 5; i++) {
-                const insectX = Math.floor(Math.random() * (width - 60)) + 30;
-                const insectY = Math.floor(Math.random() * (height - 60)) + 30;
-                const insectRadius = Math.floor(Math.random() * 5) + 5;
-                const insectType = Math.floor(Math.random() * 3);
-                
-                let insectColor;
-                if (insectType === 0) {
-                    insectColor = [0.1, 0.8, 0.1]; // Green insect
-                } else if (insectType === 1) {
-                    insectColor = [0.1, 0.1, 0.8]; // Blue insect
-                } else {
-                    insectColor = [0.8, 0.1, 0.1]; // Red insect
-                }
-                
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const distance = Math.sqrt((x - insectX) ** 2 + (y - insectY) ** 2);
-                        if (distance < insectRadius) {
-                            scene[y][x] = insectColor;
-                        }
-                    }
-                }
-            }
-            
-            // Add foliage (background elements)
-            for (let i = 0; i < 10; i++) {
-                const foliageX = Math.floor(Math.random() * (width - 80)) + 40;
-                const foliageY = Math.floor(Math.random() * (height - 80)) + 40;
-                const foliageRadius = Math.floor(Math.random() * 15) + 15;
-                
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const distance = Math.sqrt((x - foliageX) ** 2 + (y - foliageY) ** 2);
-                        if (distance < foliageRadius) {
-                            scene[y][x] = [0.05, 0.2, 0.05]; // Dark green foliage
-                        }
-                    }
-                }
-            }
-            
-            renderScene();
-        }
-        
-        // Render the scene to both canvases
-        function renderScene() {
-            // Clear canvases
-            humanCtx.clearRect(0, 0, width, height);
-            geckoCtx.clearRect(0, 0, width, height);
-            
-            // Create image data objects
-            const humanImageData = humanCtx.createImageData(width, height);
-            const geckoImageData = geckoCtx.createImageData(width, height);
-            
-            // Get night vision and color sensitivity values
-            const nightVisionStrength = parseFloat(nightVisionSlider.value);
-            const colorSensitivity = parseFloat(colorSensitivitySlider.value);
-            
-            // Fill image data
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const pixelIndex = (y * width + x) * 4;
-                    const pixel = scene[y][x];
-                    
-                    // Human vision (original scene)
-                    humanImageData.data[pixelIndex] = pixel[0] * 255;     // R
-                    humanImageData.data[pixelIndex + 1] = pixel[1] * 255; // G
-                    humanImageData.data[pixelIndex + 2] = pixel[2] * 255; // B
-                    humanImageData.data[pixelIndex + 3] = 255;            // A
-                    
-                    // Gecko vision
-                    // 1. Adjust color sensitivity (enhance blue-green, reduce red)
-                    let geckoR = pixel[0] * 0.7;
-                    let geckoG = pixel[1] * (1 + (colorSensitivity - 1) * 0.3); // Enhance green
-                    let geckoB = pixel[2] * (1 + (colorSensitivity - 1) * 0.2); // Enhance blue
-                    
-                    // 2. Enhance night vision (brighten dark areas)
-                    const luminance = 0.299 * geckoR + 0.587 * geckoG + 0.114 * geckoB;
-                    if (luminance < 0.3) {
-                        geckoR *= nightVisionStrength;
-                        geckoG *= nightVisionStrength;
-                        geckoB *= nightVisionStrength;
-                    }
-                    
-                    // Ensure values are in valid range
-                    geckoR = Math.min(1, geckoR);
-                    geckoG = Math.min(1, geckoG);
-                    geckoB = Math.min(1, geckoB);
-                    
-                    geckoImageData.data[pixelIndex] = geckoR * 255;     // R
-                    geckoImageData.data[pixelIndex + 1] = geckoG * 255; // G
-                    geckoImageData.data[pixelIndex + 2] = geckoB * 255; // B
-                    geckoImageData.data[pixelIndex + 3] = 255;          // A
-                }
-            }
-            
-            // Put image data to canvases
-            humanCtx.putImageData(humanImageData, 0, 0);
-            geckoCtx.putImageData(geckoImageData, 0, 0);
-            
-            // Draw gecko pupil (vertical ellipse)
-            geckoCtx.beginPath();
-            geckoCtx.ellipse(width / 2, height / 2, width * 0.4, height * 0.15, 0, 0, 2 * Math.PI);
-            geckoCtx.strokeStyle = 'white';
-            geckoCtx.lineWidth = 2;
-            geckoCtx.stroke();
-        }
-        
-        // Event listeners
-        generateButton.addEventListener('click', generateScene);
-        
-        nightVisionSlider.addEventListener('input', function() {
-            nightVisionValue.textContent = this.value;
-            renderScene();
+        // Event listeners for sliders
+        lightIntensitySlider.addEventListener('input', function() {
+            lightIntensityValue.textContent = this.value;
+            drawScene();
         });
         
-        colorSensitivitySlider.addEventListener('input', function() {
-            colorSensitivityValue.textContent = this.value;
-            renderScene();
+        pupilSizeSlider.addEventListener('input', function() {
+            pupilSizeValue.textContent = this.value;
+            drawScene();
+        });
+        
+        reflectivitySlider.addEventListener('input', function() {
+            reflectivityValue.textContent = this.value;
+            drawScene();
         });
         
         // Initialize on load
         window.onload = function() {
-            generateScene();
+            drawScene();
         };
     </script>
 </body>
